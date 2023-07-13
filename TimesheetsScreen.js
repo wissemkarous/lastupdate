@@ -55,14 +55,6 @@ function TimesheetsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search users..."
-          value={searchQuery}
-          onChangeText={handleSearch}
-        />
-      </View>
       <View style={styles.calendarContainer}>
         <Calendar
           onDayPress={handleDateSelect}
@@ -79,9 +71,17 @@ function TimesheetsScreen() {
           }}
         />
       </View>
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search users..."
+          value={searchQuery}
+          onChangeText={handleSearch}
+        />
+      </View>
       {selectedDate && (
         <View style={styles.selectedUsersContainer}>
-          <Text style={styles.selectedUsersTitle}>Users of the selected day:</Text>
+          <Text style={styles.selectedUsersTitle}> Users of the selected day:  </Text>
           <FlatList
             data={filteredUsers}
             renderItem={renderItem}
@@ -91,6 +91,7 @@ function TimesheetsScreen() {
       )}
     </View>
   );
+  
 }
 
 const styles = StyleSheet.create({
@@ -114,7 +115,8 @@ const styles = StyleSheet.create({
   },
   calendarContainer: {
     width: '100%',
-    marginBottom: 16,
+    marginBottom: 10,   
+      
   },
   selectedUsersContainer: {
     flex: 1,
