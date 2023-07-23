@@ -1,99 +1,174 @@
-import React, { useState, useEffect } from 'react';
-import { Text, View, TouchableOpacity, StyleSheet } from 'react-native';
-import FeatherIcon from 'react-native-vector-icons/Feather';
+import React, { useState, useEffect, useRef } from "react";
+import { StyleSheet, SafeAreaView, View, StatusBar, Text, TouchableOpacity, Image } from "react-native";
+import { Camera } from "expo-camera";
+import { MaterialIcons } from "@expo/vector-icons";
+import axios from "axios";
 
-function formatTime(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
-
-  return `${hours}:${minutes < 10 ? '0' : ''}${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
-}
-
-function TimeclockScreen() {
-  const [count1, setCount1] = useState(0);
-  const [count2, setCount2] = useState(0);
-  const [isCounting1, setIsCounting1] = useState(false);
-  const [isCounting2, setIsCounting2] = useState(false);
-  const [pauseTime, setPauseTime] = useState(0);
+export default function App() {
+  const [reload, setReload] = useState(false);
+  const [bienvenu, setBienvenu] = useState(true);
+  const [nouveau, setNouveau] = useState(false);
+  const [show, setShow] = useState(false);
+  const [nom, setNom] = useState("");
+  const [capturedImage, setCapturedImage] = useState(null);
+  let cameraRef = useRef();
+  const [hasCameraPermission, setHasCameraPermission] = useState(null);
+  const [type, setType] = useState(Camera.Constants.Type.front);
+  const [departMessage, setDepartMessage] = useState("");
 
   useEffect(() => {
-    let intervalId1;
-    let intervalId2;
+    (async () => {
+      const cameraPermission = await Camera.requestCameraPermissionsAsync();
+      setHasCameraPermission(cameraPermission.status === "granted");
+    })();
+  }, []);
 
-    if (isCounting1) {
-      intervalId1 = setInterval(() => {
-        setCount1((prevCount1) => prevCount1 + 1);
-      }, 1000);
+  if (hasCameraPermission === null) {
+    return <View />;
+  }
+  if (hasCameraPermission === false) {
+    return <Text>No access to camera</Text>;
+  }
+
+  const captureImage = async () => {
+    if (cameraRef.current) {
+      let options = {
+        quality: 0.5,
+        base64: true,
+      };
+
+      let newPhoto = await cameraRef.current.takePictureAsync(options);
+      setShow(false);
+      setReload(true);
+      setDepartMessage("Image captured, processing...");
+      setCapturedImage(newPhoto.uri);
+      const formData = new FormData();
+      formData.append("filee", newPhoto.base64);
+      axios.post("http://192.168.1.13:4000/stat", formData).then((res) => {
+        setNom(res.data.aya);
+        setNouveau(true);
+        setReload(false);
+        setDepartMessage("");
+      });
     }
-
-    if (isCounting2) {
-      intervalId2 = setInterval(() => {
-        setCount2((prevCount2) => prevCount2 + 1);
-      }, 1000);
-    }
-
-    return () => {
-      clearInterval(intervalId1);
-      clearInterval(intervalId2);
-    };
-  }, [isCounting1, isCounting2]);
+  };
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <FeatherIcon name="clock" size={100} />
-      <TouchableOpacity onPress={() => setIsCounting1(!isCounting1)} style={styles.cameraButton}>
-        <FeatherIcon name={isCounting1 ? 'pause' : 'play'} size={30} color="white" />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => setIsCounting2(!isCounting2)} style={styles.coffeeButton}>
-        <FeatherIcon name={isCounting2 ? 'pause' : 'coffee'} size={30} color="white" />
-      </TouchableOpacity>
-      {isCounting1 && (
-        <View style={styles.header}>
-          <Text style={styles.headerText}>Work Time: {formatTime(count1)}</Text>
-        </View>
-      )}
-      {isCounting2 && (
-        <View style={styles.header}>
-          <Text style={styles.headerText}>Pause: {formatTime(count2)}</Text>
-        </View>
-      )}
-    </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.backgroundContainer}>
+        {show ? (
+          <Camera
+            autoFocus={Camera.Constants.AutoFocus.off}
+            ref={cameraRef}
+            style={styles.camera}
+            type={type}
+          />
+        ) : null}
+        {capturedImage ? (
+          <Image source={{ uri: capturedImage }} style={styles.capturedImage} />
+        ) : null}
+      </View>
+      {bienvenu ? (
+        <TouchableOpacity
+          onPress={() => {
+            setShow(true);
+            setBienvenu(false);
+          }}
+          style={styles.startButton}
+        >
+          <MaterialIcons name="play-arrow" size={30} color="white" />
+        </TouchableOpacity>
+      ) : null}
+      {nouveau ? (
+        <TouchableOpacity
+          style={styles.auth}
+          onPress={() => {
+            setNom("");
+            setCapturedImage(null);
+            setShow(true);
+            setNouveau(false);
+          }}
+        >
+          <Text style={styles.authText}>Nouveau</Text>
+        </TouchableOpacity>
+      ) : null}
+      {nom !== "" ? <Text style={styles.bienvenueText}>Bienvenue {nom}</Text> : null}
+      {departMessage ? <Text style={styles.departText}>{departMessage}</Text> : null}
+      {show && !nouveau ? (
+        <TouchableOpacity onPress={captureImage} style={styles.captureButton}>
+          <MaterialIcons name="camera" size={30} color="white" />
+        </TouchableOpacity>
+      ) : null}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    position: 'absolute',
-    top: 0,
-    width: '100%',
-    paddingVertical: 10,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#ffffff',
+  container: {
+    flex: 1,
+    marginTop: StatusBar.currentHeight,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  headerText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  backgroundContainer: {
+    flex: 1,
+    position: "relative",
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  cameraButton: {
-    position: 'absolute',
+  camera: {
+    flex: 1,
+    width: "100%",
+  },
+  auth: {
+    backgroundColor: "#18B6EC",
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 20,
+  },
+  authText: {
+    color: "white",
+    fontSize: 18,
+  },
+  bienvenueText: {
+    fontSize: 30,
+    fontWeight: "bold",
+    marginTop: 20,
+  },
+  departText: {
+    fontSize: 20,
+    marginTop: 10,
+  },
+  captureButton: {
+    position: "absolute",
+    bottom: 20,
+    right: 210,
+    //rouge #FF0000
+    backgroundColor: "#FF0000",
+    //agrandir le bouton
+
+    width: 80,
+    height: 80,
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  capturedImage: {
+    width: 500,
+    height: 500,
+    marginTop: 20,
+    borderRadius: 10,
+  },
+  startButton: {
+    position: "absolute",
     bottom: 20,
     right: 20,
-    backgroundColor: '#00bfff',
-    borderRadius: 50,
-    padding: 10,
-  },
-  coffeeButton: {
-    position: 'absolute',
-    bottom: 100,
-    right: 20,
-    backgroundColor: 'orange',
-    borderRadius: 50,
-    padding: 10,
+    backgroundColor: "#18B6EC",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
-
-export default TimeclockScreen;
